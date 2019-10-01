@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace PartsUnlimited.Models
 {
+    //Second comment
     public class Category
     {
         public int CategoryId { get; set; }
