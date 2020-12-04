@@ -1,0 +1,77 @@
+name: $(date:yyyyMMdd)$(rev:.r)
+
+resources:
+  repositories:
+  - repository: self
+    type: git
+    ref: master
+jobs:
+- job: Phase_1
+  displayName: Build WebSite
+  cancelTimeoutInMinutes: 1
+  pool:
+    vmImage: vs2017-win2016
+  steps:
+  - checkout: self
+  - task: UseDotNet@2
+    displayName: Use .NET Core sdk 2.1.403
+    inputs:
+      version: 2.1.403
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: 'Source/SmartHotel360.Website/SmartHotel360.Website.csproj '
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      projects: 'Source/SmartHotel360.Website/SmartHotel360.Website.csproj '
+      arguments: --configuration $(BuildConfiguration)
+  - task: DotNetCoreCLI@2
+    displayName: Publish
+    inputs:
+      command: publish
+      publishWebProjects: True
+      projects: 'Source/SmartHotel360.Website/SmartHotel360.Website.csproj '
+      arguments: --configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)
+      zipAfterPublish: True
+  - task: PublishBuildArtifacts@1
+    displayName: Publish Artifact- Website package
+    inputs:
+      PathtoPublish: $(build.artifactstagingdirectory)
+      ArtifactName: web
+      TargetPath: '\\my\share\$(Build.DefinitionName)\$(Build.BuildNumber)'
+  - task: PublishBuildArtifacts@1
+    displayName: Publish Artifact- ARM Template
+    condition: succeededOrFailed()
+    inputs:
+      PathtoPublish: $(Build.SourcesDirectory)/Deploy
+      ArtifactName: arm
+      TargetPath: '\\my\share\$(Build.DefinitionName)\$(Build.BuildNumber)'
+- job: Phase_2
+  displayName: Build Pet Checker Functions App
+  cancelTimeoutInMinutes: 1
+  pool:
+    vmImage: vs2017-win2016
+  steps:
+  - checkout: self
+  - task: NuGetToolInstaller@1
+    displayName: Use NuGet 4.4.1
+    inputs:
+      versionSpec: 4.4.1
+  - task: NuGetCommand@2
+    displayName: NuGet restore
+    inputs:
+      solution: Source/SmartHotel360.WebsiteFunction/SmartHotel360.WebsiteFunction.csproj
+  - task: VSBuild@1
+    displayName: Build solution Source/SmartHotel360.WebsiteFunction/SmartHotel360.WebsiteFunction.csproj
+    inputs:
+      solution: Source/SmartHotel360.WebsiteFunction/SmartHotel360.WebsiteFunction.csproj
+      msbuildArgs: /p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactstagingdirectory)\\"
+      platform: $(BuildPlatform)
+      configuration: $(BuildConfiguration)
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: Function-app'
+    inputs:
+      ArtifactName: Function-app
+...
